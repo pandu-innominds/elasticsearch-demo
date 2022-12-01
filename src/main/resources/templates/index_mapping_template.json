@@ -1,0 +1,27 @@
+{
+  "mappings": {
+    "properties": {
+      "id": {
+        "type": "long"
+      },
+      "name": {
+        "type": "text",
+        "fields": {
+          "nameLower": {
+            "type": "keyword",
+            "normalizer": "lowercase"
+          },
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      },
+      "age": {
+        "type": "integer"
+      },
+      "address": {
+        "type": "text"
+      }
+    }
+  }
+}
