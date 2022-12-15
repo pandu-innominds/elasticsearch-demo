@@ -2,20 +2,24 @@ package com.innominds.service.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
+import com.innominds.TestDataGenerator;
 import com.innominds.configuration.ElasticSearchClient;
 import com.innominds.model.Patient;
-import com.innominds.service.ElasticSearchService;
+import com.innominds.service.PatientService;
 import org.elasticsearch.action.admin.indices.alias.IndicesAliasesRequest;
 import org.elasticsearch.action.admin.indices.alias.get.GetAliasesRequest;
+import org.elasticsearch.action.bulk.BulkRequest;
+import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.action.support.WriteRequest;
 import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.GetAliasesResponse;
 import org.elasticsearch.client.RequestOptions;
-import org.elasticsearch.client.core.AcknowledgedResponse;
 import org.elasticsearch.client.indices.CreateIndexRequest;
 import org.elasticsearch.client.indices.GetIndexRequest;
 import org.elasticsearch.common.settings.Settings;
@@ -44,7 +48,7 @@ import java.util.stream.Collectors;
 import static java.util.Collections.singletonMap;
 
 @Service
-public class ElasticSearchServiceImpl implements ElasticSearchService {
+public class PatientServiceImpl implements PatientService {
 
     @Autowired
     ElasticSearchClient client;
@@ -78,10 +82,15 @@ public class ElasticSearchServiceImpl implements ElasticSearchService {
             System.out.println("Time Formatted : " + currentTime);
             indexName = indexName + "_" + currentTime;
             CreateIndexRequest indexRequest = new CreateIndexRequest(indexName);
-            String message = "{\"properties\":{\"id\":{\"type\":\"long\"},\"name\":{\"type\":\"text\"," +
-                    "\"fields\":{\"nameLower\":{\"type\":\"keyword\",\"normalizer\":\"lowercase\"}," +
-                    "\"keyword\":{\"type\":\"keyword\"}}},\"age\":{\"type\":\"integer\"}," +
-                    "\"address\":{\"type\":\"text\"}}}";
+            String message = "{\"properties\":{\"id\":{\"type\":\"long\"},\"name\":{\"type\":\"text\"" +
+                    ",\"fields\":{\"nameLower\":{\"type\":\"keyword\",\"normalizer\":\"lowercase\"}," +
+                    "\"keyword\":{\"type\":\"keyword\"}}},\"age\":{\"type\":\"integer\"},\"address\"" +
+                    ":{\"type\":\"text\"},\"prescriptions\":{\"type\":\"nested\",\"properties\":{\"id\":" +
+                    "{\"type\":\"long\"},\"date\":{\"type\":\"text\"},\"bloodPressure\":{\"type\":\"text\"}," +
+                    "\"weight\":{\"type\":\"float\"},\"temperature\":{\"type\":\"float\"},\"diagnosis\":" +
+                    "{\"type\":\"text\"},\"medications\":{\"type\":\"nested\",\"properties\":{\"code\":" +
+                    "{\"type\":\"text\"},\"name\":{\"type\":\"text\"},\"numberOfUnits\":{\"type\":\"long\"}," +
+                    "\"numberOfDays\":{\"type\":\"long\"},\"daySchedule\":{\"type\":\"text\"}}}}}}}";
             XContentBuilder b;
             b = XContentFactory.jsonBuilder().prettyPrint();
             try (XContentParser p = XContentFactory.xContent(XContentType.JSON)
@@ -129,7 +138,7 @@ public class ElasticSearchServiceImpl implements ElasticSearchService {
     }
 
     @Override
-    public Integer addPatient(Patient patient) {
+    public Long addPatient(Patient patient) {
         try {
             Map<String, Object> jsonMap = new LinkedHashMap<>();
             jsonMap.put("id", patient.getId());
@@ -233,7 +242,7 @@ public class ElasticSearchServiceImpl implements ElasticSearchService {
         request.setScript(
                 new Script(
                         ScriptType.INLINE, "painless",
-                        "ctx._source.address = params.address",
+                        "ctx._source.prescriptions[0].medications[] = params.address",
                         parameters));
         try {
             client.getElasticClient().updateByQuery(
@@ -252,6 +261,31 @@ public class ElasticSearchServiceImpl implements ElasticSearchService {
         } catch (IOException e) {
             e.printStackTrace();
             //throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void createPatients(String indexName, Integer numOfPatients) {
+        TestDataGenerator dataGenerator = new TestDataGenerator();
+        List<Patient> patients = null;
+        try {
+            patients = dataGenerator.generatePatients(numOfPatients);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        System.out.println("Size of the test content generated :: " + patients.size());
+        Gson gson =new Gson();
+        BulkRequest bulkRequest = new BulkRequest();
+        patients.forEach(patient -> {
+            IndexRequest indexRequest = new IndexRequest(indexName).id(patient.getId().toString())
+                    .source(gson.toJson(patient), XContentType.JSON);
+            bulkRequest.add(indexRequest);
+        });
+        try {
+            bulkRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.IMMEDIATE);
+            BulkResponse bulkResponse = client.getElasticClient().bulk(bulkRequest, RequestOptions.DEFAULT);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 

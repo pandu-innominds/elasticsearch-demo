@@ -4,13 +4,13 @@ import com.innominds.model.Patient;
 
 import java.util.List;
 
-public interface ElasticSearchService {
+public interface PatientService {
 
     void createIndex(String indexName);
 
     String createIndexWithMappings(String indexName);
 
-    Integer addPatient(Patient patient);
+    Long addPatient(Patient patient);
 
     List<Patient> getPatients(Integer limit, String sortField, String sortOrder);
 
@@ -21,4 +21,6 @@ public interface ElasticSearchService {
     void updatePatients(String searchByAddress, String addressToBeUpdated);
 
     void deletePatient(Integer patientId);
+
+    void createPatients(String indexName, Integer numOfPatients);
 }

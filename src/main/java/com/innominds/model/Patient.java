@@ -1,17 +1,21 @@
 package com.innominds.model;
 
+import java.util.List;
+
 public class Patient {
 
-    private Integer id;
+    private Long id;
     private String name;
     private Integer age;
     private String address;
 
-    public Integer getId() {
+    private List<Prescription> prescriptions;
+
+    public Long getId() {
         return id;
     }
 
-    public void setId(Integer id) {
+    public void setId(Long id) {
         this.id = id;
     }
 
@@ -37,5 +41,17 @@ public class Patient {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    public List<Prescription> getPrescriptions() {
+        return prescriptions;
+    }
+
+    public void setPrescriptions(List<Prescription> prescriptions) {
+        this.prescriptions = prescriptions;
+    }
+
+    public String toString() {
+        return "[" + id + ", " + name + ", " + age + ", " + address + ", " + prescriptions + "]";
     }
 }
